@@ -641,11 +641,12 @@ const (
 
 func newVolInfoCmd(client *master.MasterClient) *cobra.Command {
 	var (
-		optMetaDetail bool
-		optDataDetail bool
+		optMetaDetail     bool
+		optDataDetail     bool
+		optDpDistribution bool
 	)
 
-	cmd := &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   cmdVolInfoUse,
 		Short: cmdVolInfoShort,
 		Args:  cobra.MinimumNArgs(1),
@@ -696,6 +697,30 @@ func newVolInfoCmd(client *master.MasterClient) *cobra.Command {
 					stdout("%v\n", formatDataPartitionTableRow(dp))
 				}
 			}
+
+			// print data partition distribution
+			if optDpDistribution {
+				var view *proto.DataPartitionsView
+				if view, err = client.ClientAPI().GetDataPartitions(volumeName); err != nil {
+					err = fmt.Errorf("Get volume data partition distribution information failed:\n%v\n", err)
+					return
+				}
+				var distribution *Distribution = NewDistribution()
+				for _, dp := range view.DataPartitions {
+					for _, host := range dp.Hosts {
+						distribution.Add(host, dp.Status == 2)
+					}
+				}
+				stdout("Data partitions distribution:\n")
+				stdout("%v\n", dataPartitionDistributionTableHeader)
+				sort.SliceStable(distribution.List, func(i, j int) bool {
+					return distribution.List[i].WritableCnt < distribution.List[j].WritableCnt
+				})
+				for _, dd := range distribution.List {
+					stdout("%v\n", formatDataPartitionDistributionTableRow(dd))
+				}
+			}
+			return
 		},
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) != 0 {
@@ -706,6 +731,7 @@ func newVolInfoCmd(client *master.MasterClient) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&optMetaDetail, "meta-partition", "m", false, "Display meta partition detail information")
 	cmd.Flags().BoolVarP(&optDataDetail, "data-partition", "d", false, "Display data partition detail information")
+	cmd.Flags().BoolVarP(&optDpDistribution, "data-partition-distribution", "p", false, "Display data partition distribution information")
 	return cmd
 }
 

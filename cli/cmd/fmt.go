@@ -1026,3 +1026,51 @@ func replicaInHost(hosts []string, replica string) bool {
 	}
 	return false
 }
+
+type Distribution struct {
+	Hash map[string]*DistributionRow
+	List []*DistributionRow
+}
+
+type DistributionRow struct {
+	Addr        string
+	Cnt         int
+	WritableCnt int
+}
+
+func NewDistribution() *Distribution {
+	return &Distribution{
+		Hash: make(map[string]*DistributionRow),
+	}
+}
+
+func NewDistributionRow(addr string) *DistributionRow {
+	return &DistributionRow{Addr: addr}
+}
+
+func (d *Distribution) Add(addr string, writable bool) {
+	var (
+		row *DistributionRow
+		ok  bool
+	)
+	if row, ok = d.Hash[addr]; !ok {
+		row = NewDistributionRow(addr)
+		d.Hash[addr] = row
+		d.List = append(d.List, row)
+	}
+	row.Cnt++
+	if writable {
+		row.WritableCnt++
+	}
+}
+
+var (
+	dataPartitionDistributionTablePattern = "%-20v    %-8v    %-8v"
+	dataPartitionDistributionTableHeader  = fmt.Sprintf(dataPartitionDistributionTablePattern,
+		"ADDRESS", "DpCount", "WritableDpCount")
+)
+
+func formatDataPartitionDistributionTableRow(view *DistributionRow) string {
+	return fmt.Sprintf(dataPartitionDistributionTablePattern,
+		view.Addr, view.Cnt, view.WritableCnt)
+}
